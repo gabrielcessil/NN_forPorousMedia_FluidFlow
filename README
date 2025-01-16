@@ -1,1 +1,6 @@
 This are the initial steps of my dissertation project that aims to predict fluid flow in porous media. Here you can find my attemps to define a new architecture based on Inception.
+
+My initial work is inspired on the MS-NET (link here: https://github.com/je-santos/ms_net).
+
+To save time on initial validations, the current state of my work is trying to overfit one single LBM simulation. Simulations can be find in https://www.digitalrocksportal.org/projects/372.
+Then, fill the present folder "LBM_Simulations" with '.mat'. The code provided here will split this 3D rock simulation in many 2D planes and train/validate from this. 
