@@ -2,6 +2,7 @@ import torch
 import numpy as np
 from datetime import datetime
 import matplotlib.pyplot as plt
+from Utilities.usage_metrics import get_memory_usage, check_memory, estimate_memory
 
 #### NEURAL NETWORK UTILITIES 
 
@@ -45,43 +46,60 @@ def validate_one_epoch(model, valid_loader, loss_function):
       
       return valid_avg_loss
     
+def verify_memory(model, in_shape, batch_size, device, dtype=torch.float32):
+    current_memory = check_memory(device=device)
+    estimative_memory = estimate_memory(model, input_size=in_shape, batch_size=batch_size, dtype=torch.float32)
+    if estimative_memory["Parameters"] > current_memory["Free"]: 
+        raise ValueError("Free memory is not sufficient for trainning. Change device, reduce batch size or review architecture")
 
-def full_train(model, train_loader, valid_loader, loss_function, optimizer,N_epochs=1000, file_name = "model_weights", include_time=False):
-
+def full_train(model, train_loader, valid_loader, loss_function, optimizer,N_epochs=1000, file_name = "model_weights", include_time=False, device="cpu"):
+    inputs, targets = next(iter(train_loader))    
+    in_shape = (inputs.shape[1],inputs.shape[2],inputs.shape[3]) #(C,H,W)
+    batch_size = inputs.shape[0]
+    verify_memory(model, in_shape, batch_size, device, dtype=torch.float32)
+  
     timestamp = datetime.now().strftime('%Y%m%d_%H%M%S')
     train_cost_history = []
     val_cost_history = []
     best_valid_loss = np.inf    
-    saved_model = None
+    model_paths = []
+
+    progress_points = set(int(N_epochs * i / 100) for i in range(5, 101, 5))  # Define os pontos de 5% a 100%
     
     for epoch_index in range(N_epochs):
-          
-      print("\nExecutando epoca ", epoch_index, " /", N_epochs)
+    
       train_avg_loss, model = train_one_epoch( 
           model=model,
           train_loader=train_loader,
           loss_function=loss_function, 
           optimizer=optimizer)
-     
+      
       valid_avg_loss = validate_one_epoch(
           model=model, 
           valid_loader=valid_loader,
-          loss_function=loss_function)      
-      
-      print(' - Average Loss in train {}\n - Average Loss in validation {}'.format(train_avg_loss, valid_avg_loss))
+          loss_function=loss_function)
       
       train_cost_history.append(train_avg_loss)
       val_cost_history.append(valid_avg_loss)
       
       # Track best performance, and save the model's state
       if valid_avg_loss < best_valid_loss:
-          print("Melhor custo encontrado: ", valid_avg_loss, "\n")
           best_valid_loss = valid_avg_loss
-          if include_time: model_path = file_name+"_{}_{}.pth".format(timestamp, epoch_index)
+          # Define the path name
+          if include_time: model_path = file_name+"lowerValLoss_{}_{}.pth".format(timestamp, epoch_index)
           else: model_path = file_name
           torch.save(model.state_dict(), model_path)
+         
+      if epoch_index in progress_points:
+          percent = round((epoch_index / N_epochs) * 100,2)  # Calcula o percentual relativo
+          print(f"\nExecutando epoca {epoch_index} / {N_epochs} ({percent:.1f}%)")
+          print("Allocated memory {} (MB) ".format(round(get_memory_usage())))
+          
+          model_path = file_name+"_ProgressTracking_{}.pth".format(round((epoch_index / N_epochs) * 100))
+          torch.save(model.state_dict(), model_path)
+          model_paths.append(model_path)
       
-    return model_path, train_cost_history, val_cost_history
+    return model_paths, train_cost_history, val_cost_history
 
 
 def Plot_Validation(train_cost_history, val_cost_history):

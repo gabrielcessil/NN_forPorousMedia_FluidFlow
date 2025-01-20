@@ -157,9 +157,9 @@ class Parallel_Inception_Block(nn.Module):
         # Conv Block: in_channels , out_channels , kernel_size , stride , padding
         # InceptionBlock:  in_channels , b1_out_channels , b2_mid_channels , b2_out_channels , b3_mid_channels , b3_out_channels , b4_out_channels
         
-        print("Parallel_Inception_Block Initialization:\n")
+        print("\n\n  Parallel_Inception_Block Initialization:")
         
-        print("Input shape: ", (in_size,in_size,in_channels))
+        print(" - Input shape: ", (in_size,in_size,in_channels))
         # HEAD
         conv_0_1 = ConvBlock(in_channels,
                           out_channels=32,
@@ -168,14 +168,14 @@ class Parallel_Inception_Block(nn.Module):
                           padding=0,
                           input_size=in_size)
         
-        print("head_1 output shape: ", conv_0_1.output_shape)
+        print(" - head_1 output shape: ", conv_0_1.output_shape)
         conv_0_2 = ConvBlock(in_channels=32,
                           out_channels=64,
                           kernel_size=7,
                           stride=1,
                           padding=0,
                           input_size=conv_0_1.output_size)
-        print("head_2 output shape: ", conv_0_2.output_shape)
+        print(" - head_2 output shape: ", conv_0_2.output_shape)
         self.head = nn.Sequential(conv_0_1,conv_0_2)
 
         # FIRST BRANCH
@@ -187,7 +187,7 @@ class Parallel_Inception_Block(nn.Module):
                                 b3_out_channels=16,
                                 b4_out_channels=128,
                                 input_size=conv_0_2.output_size)
-        print("incp_1 output shape: ", incp_1.output_shape)
+        print(" - incp_1 output shape: ", incp_1.output_shape)
         maxp_1 =  nn.MaxPool2d(kernel_size=3,
                       stride=2,
                       padding=1)
@@ -195,7 +195,7 @@ class Parallel_Inception_Block(nn.Module):
                                                    kernel_size=3,
                                                    stride=2,
                                                    padding=1)
-        print("maxp_1 output shape: ", (maxp_1_out_size,maxp_1_out_size,incp_1.output_shape[2]))
+        print(" - maxp_1 output shape: ", (maxp_1_out_size,maxp_1_out_size,incp_1.output_shape[2]))
         self.branch_1 = nn.Sequential(incp_1,maxp_1)
 
         # SECOND BRANCH
@@ -207,7 +207,7 @@ class Parallel_Inception_Block(nn.Module):
                                 b3_out_channels=16,
                                 b4_out_channels=128,
                                 input_size=conv_0_2.output_size)
-        print("incp_2 output shape: ", incp_2.output_shape)
+        print(" - incp_2 output shape: ", incp_2.output_shape)
         maxp_2 = nn.MaxPool2d(kernel_size=3,
                      stride=2,
                      padding=1)
@@ -215,7 +215,7 @@ class Parallel_Inception_Block(nn.Module):
                                                    kernel_size=3,
                                                    stride=2,
                                                    padding=1)
-        print("maxp_2 output shape: ", (maxp_2_out_size,maxp_2_out_size,incp_2.output_shape[2]))
+        print(" - maxp_2 output shape: ", (maxp_2_out_size,maxp_2_out_size,incp_2.output_shape[2]))
         self.branch_2 = nn.Sequential(incp_2,maxp_2)
                                       
         
@@ -223,13 +223,13 @@ class Parallel_Inception_Block(nn.Module):
         # TAIL 
         branches_concat_size = int(maxp_1_out_size**2*incp_1.output_shape[2] + maxp_2_out_size**2*incp_2.output_shape[2])
         
-        print("concat output shape: ", branches_concat_size)
+        print(" - concat output shape: ", branches_concat_size)
         self.tail =  nn.Sequential(nn.Linear(branches_concat_size,out_size**2),
                                    nn.Dropout(p=0.4))
-        print("linear_tail output shape: ", out_size**2)
+        print(" - linear_tail output shape: ", out_size**2)
                 
         self.output_layer = nn.Linear(out_size**2, out_size**2)
-        print("linear_output shape: ", out_size**2)
+        print(" - linear_output shape: ", out_size**2)
         
         self.output_size = out_size**2
         self.output_shape = (out_size**2,out_size**2,1) 

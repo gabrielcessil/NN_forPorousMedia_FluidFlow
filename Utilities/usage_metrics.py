@@ -3,8 +3,6 @@ import torch
 
 def get_ProcessingTime(nOperations, flops, nLoops=1): return nLoops*nOperations/flops
 
-def get_MemoryUsage_MB(nParameters, nBytes): return nParameters*nBytes/ 1048576
-
 def check_memory(device="cpu"):
     """
     Verifica a memória disponível e usada no dispositivo especificado.
@@ -21,44 +19,110 @@ def check_memory(device="cpu"):
         allocated_memory = torch.cuda.memory_allocated(0)
         free_memory = reserved_memory - allocated_memory
         
-        print(f"\n\nDispositivo: GPU")
-        print(f"Memória Total: {total_memory / (1024**2):.2f} MB")
-        print(f"Memória Reservada: {reserved_memory / (1024**2):.2f} MB")
-        print(f"Memória Alocada: {allocated_memory / (1024**2):.2f} MB")
-        print(f"Memória Livre: {free_memory / (1024**2):.2f} MB")
-        return {"total": total_memory, "used": allocated_memory, "free": free_memory}
+        print("\n\nDevice: GPU")
+        print(f"System's Total memory: {round(total_memory)} MB")
+        print(f"System's Allocated memory': {round(allocated_memory)} MB")
+        print(f"System's Free memory': {round(free_memory)} MB")
+        return {"Total": total_memory, "Used": allocated_memory, "Free": free_memory}
     else:
         memory = psutil.virtual_memory()
-        total_memory = memory.total
-        used_memory = memory.used
-        free_memory = memory.available
+        total_memory = memory.total/(1024**2)
+        used_memory = memory.used/(1024**2)
+        free_memory = memory.available/(1024**2)
 
-        print(f"\n\nDispositivo: CPU")
-        print(f"Memória Total: {total_memory / (1024**2):.2f} MB")
-        print(f"Memória Usada: {used_memory / (1024**2):.2f} MB")
-        print(f"Memória Livre: {free_memory / (1024**2):.2f} MB")
-        return {"total": total_memory, "used": used_memory, "free": free_memory}
+        print("\n\nDevice: CPU")
+        print(f"System's Total memory: {round(total_memory)} MB")
+        print(f"System's Allocated memory': {round(used_memory)} MB")
+        print(f"System's Free memory': {round(free_memory)} MB")
+        return {"Total": total_memory, "Used": used_memory, "Free": free_memory}
 
 import gc
 
 def clear_gpu_memory():
-    """Clears unused GPU memory cache."""
+    """Limpa o cache de memória da GPU."""
     if torch.cuda.is_available():
+        torch.cuda.synchronize()
         torch.cuda.empty_cache()
 
 def clear_cpu_memory():
-    """Free up memory used by CPU tensors explicitly."""
-    gc.collect()
+    """Libera a memória utilizada por tensores da CPU."""
+    for _ in range(10):
+        gc.collect()
 
 def delete_model(model):
-    """Removes the PyTorch model and frees associated memory."""
-    # Delete the model reference
+    """Deleta o modelo PyTorch e libera a memória associada."""
+
+    # Remover referências a submódulos e parâmetros
+    for name, module in model.named_modules():
+        del module
+    for param in model.parameters():
+        del param
+
+    # Deletar a referência ao modelo
     del model
 
-    # Clear GPU memory if the model was on the GPU
+    # Limpar memória da GPU e CPU
     clear_gpu_memory()
-
-    # Clear CPU memory using garbage collection
     clear_cpu_memory()
 
-    print("PyTorch model and associated memory freed.")
+    print("Modelo PyTorch e memória associada liberados.")
+    
+# Função para obter o uso de memória do processo
+def get_memory_usage():
+    process = psutil.Process()
+    memory_info = process.memory_info()
+    return memory_info.rss / (1024 ** 2)  # Em MB
+
+def estimate_memory(model, input_size, batch_size=1, dtype=torch.float32):
+    """
+    Estima a memória necessária para treinar a rede neural.
+
+    Args:
+        model (nn.Module): O modelo PyTorch a ser analisado.
+        input_size (tuple): Tamanho do tensor de entrada no formato (C, H, W).
+        batch_size (int): Tamanho do lote usado durante o treinamento.
+        dtype (torch.dtype): Tipo de dado usado (ex. torch.float32).
+
+    Returns:
+        dict: Dicionário contendo estimativas de memória para parâmetros e ativações.
+    """
+
+    dtype_size = torch.tensor([], dtype=dtype).element_size()
+
+    param_memory = 0
+    activation_memory = 0
+
+    def hook_fn(module, input, output):
+        nonlocal param_memory, activation_memory
+
+        if not hasattr(module, '_params_hooked'):
+            for param in module.parameters():
+                param_memory += param.numel() * dtype_size
+            module._params_hooked = True
+
+        if isinstance(output, torch.Tensor):
+            activation_memory += output.numel() * dtype_size
+        elif isinstance(output, (tuple, list)):
+            for out in output:
+                activation_memory += out.numel() * dtype_size
+
+    hooks = []
+    for name, layer in model.named_modules():
+        hooks.append(layer.register_forward_hook(hook_fn))
+
+    with torch.no_grad():
+        _ = model(torch.zeros((batch_size, *input_size), dtype=dtype))
+
+    for hook in hooks:
+        hook.remove()
+    result  = {
+        "Parameters": param_memory / (1024 ** 2),
+        "Activations": activation_memory / (1024 ** 2),
+        "Total": (param_memory + activation_memory) / (1024 ** 2),
+    }
+    
+    print("Memory Usage estimation for Trainning:")
+    for key, value in result.items():  print(key," Memory (MB):", round(value))
+    
+    return result
+

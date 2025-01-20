@@ -177,52 +177,40 @@ def plot_3d_planes(array_3d, x_offset=0., y_offset=0., z_offset=0., file_name="3
     fig.write_html(file_name)
     print(f"Gráfico 3D salvo como '{file_name}'")
     
-def plot_heatmap(array_2d, output_file="heatmap_hd.png", dpi=300, cmap="inferno", xlabel="X-axis", ylabel="Y-axis", title="Heatmap", colorbar_label="Value", vmin=1, vmax=180):
+
+def plot_heatmap(
+    array_2d, 
+    filename, 
+    colormap='viridis', 
+    xlabel='X-axis', 
+    ylabel='Y-axis', 
+    title='2D Array Plot', 
+    vmin=-2.0,  # Fixed minimum value for the colorscale
+    vmax=2.0,  # Fixed maximum value for the colorscale
+    dpi=300, 
+    figsize=(8, 6)
+):
     """
-    Create and save a high-resolution heatmap from a 2D NumPy array with solid cell colors, gridlines, and adjustable color range.
+    Plot a 2D array in HD with a fixed colorscale and save it to a file.
 
     Parameters:
-        array_2d (np.ndarray): 2D NumPy array to plot.
-        output_file (str): File name to save the heatmap (e.g., "heatmap_hd.png").
-        dpi (int): Resolution of the output image in dots per inch (default: 300).
-        cmap (str): Matplotlib colormap to use (default: "inferno").
-        xlabel (str): Label for the x-axis.
-        ylabel (str): Label for the y-axis.
-        title (str): Title of the heatmap.
-        colorbar_label (str): Label for the colorbar.
-        vmin (float): Minimum value for the color scale (default: None, automatic scaling).
-        vmax (float): Maximum value for the color scale (default: None, automatic scaling).
+        array_2d (np.ndarray): The 2D array to plot.
+        filename (str): Path to save the output image.
+        colormap (str): Colormap to use (default: 'viridis').
+        xlabel (str): Label for the X-axis.
+        ylabel (str): Label for the Y-axis.
+        title (str): Title of the plot.
+        vmin (float): Fixed minimum value for the colorscale.
+        vmax (float): Fixed maximum value for the colorscale.
+        dpi (int): Resolution of the saved image (default: 300).
+        figsize (tuple): Size of the figure in inches (default: (8, 6)).
     """
-    
-    """
-    # Create the figure
-    fig, ax = plt.subplots(figsize=(16, 9))  # Full HD aspect ratio
-
-    # Plot the heatmap with no interpolation (solid colors) and custom color range
-    heatmap = ax.imshow(array_2d, cmap=cmap, aspect="auto",
-                        origin="upper", interpolation="none", vmin=vmin, vmax=vmax)
-
-    # Add gridlines for the grid view
-    ax.set_xticks(np.arange(-0.5, array_2d.shape[1], 1), minor=True)
-    ax.set_yticks(np.arange(-0.5, array_2d.shape[0], 1), minor=True)
-    ax.grid(which="minor", color="black", linestyle="-", linewidth=0.5)
-    ax.tick_params(which="minor", bottom=False, left=False)
-
-    # Add a colorbar
-    cbar = plt.colorbar(heatmap, ax=ax)
-    cbar.set_label(colorbar_label)
-
-    # Set labels and title
-    ax.set_xlabel(xlabel)
-    ax.set_ylabel(ylabel)
-    ax.set_title(title)
-
-    # Save the plot in HD resolution
-    plt.savefig(output_file, dpi=dpi, bbox_inches="tight")
-    plt.show()
-    plt.close()
-    print(f"Heatmap saved as '{output_file}'")
-    """
-    plt.imshow(array_2d, cmap='viridis', interpolation=None)
+    plt.figure(figsize=figsize, dpi=dpi)
+    plt.imshow(array_2d, cmap=colormap, interpolation='none', vmin=vmin, vmax=vmax)
     plt.colorbar()
+    plt.xlabel(xlabel)
+    plt.ylabel(ylabel)
+    plt.title(title)
+    plt.tight_layout()
+    plt.savefig(filename, dpi=dpi)
     plt.show()
