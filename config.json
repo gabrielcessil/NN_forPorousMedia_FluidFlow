@@ -1,0 +1,10 @@
+{
+    "LBPM_IO_folder": "/media/gabriel/a91864d5-f0d3-4994-921d-b2238c6ce60e/labcc/\u00c1rea de Trabalho/LBPM_Results",
+    "NN_dataset_folder": "/home/gabriel/Downloads/Dissertacao/Github/My_Inception_NNArchitecture/NN_Datasets",
+    "raw_shape": [
+        50,
+        50
+    ],
+    "LBPM_installation_folder": "/home/gabriel/Documents/LBPM_Install",
+    "silo2vti_exe_folder": "/home/gabriel/Documents/LBPM_Install/silo2vti/silo2vti-master/silo2vti"
+}
