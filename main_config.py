@@ -4,15 +4,17 @@ import json
 # INPUTS
 
 # Where the LBPM inputs (raw, db, etc) and outputs (silo, vti, etc) are locatte or must be saved
-LBPM_IO_folder = r"/media/gabriel/a91864d5-f0d3-4994-921d-b2238c6ce60e/labcc/Área de Trabalho/LBPM_Results"
+LBPM_IO_folder = r"/home/gabriel/Desktop/Dissertacao/"
 # Where the converter of silo to vti is installed (exe file)
 silo2vti_exe_folder = r"/home/gabriel/Documents/LBPM_Install/silo2vti/silo2vti-master/silo2vti"
 # Where the LBPM is installed (main folder)
-LBPM_installation_folder = "/home/gabriel/Documents/LBPM_Install"
+LBPM_installation_folder = r"/home/gabriel/Documents/LBPM_Install"
 # Where the resulting pytorch dataset must be saved
-NN_dataset_folder = "/home/gabriel/Downloads/Dissertacao/Github/My_Inception_NNArchitecture/NN_Datasets"
+NN_dataset_folder = r"/home/gabriel/Desktop/Dissertacao/Code/NN_Datasets/"
 # The fixed shape of examples
 raw_shape = (50, 50)
+# Where the NN model must be saved
+NN_model_weights_folder = r"/home/gabriel/Desktop/Dissertacao/Code/NN_Model_Weights/"
 
 
 # COMPUTATIONS
@@ -21,6 +23,7 @@ raw_shape = (50, 50)
 config = {
     "LBPM_IO_folder":LBPM_IO_folder,
     "NN_dataset_folder": NN_dataset_folder,
+    "NN_model_weights_folder":NN_model_weights_folder,
     "raw_shape": [raw_shape[0], raw_shape[1]],
     "LBPM_installation_folder": LBPM_installation_folder,
     "silo2vti_exe_folder":silo2vti_exe_folder

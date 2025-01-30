@@ -5,17 +5,18 @@ from Utilities import LBPM_runner
 import json
 
 # CREATING SEVERAL DOMAINS FOR LBPM
-"""
+
 # Nome base para salvar
-simulation_base_name = "Example_Stoch"
+simulation_base_name = "Example_Stoch_50x50"
 
 # Parâmetros do meio poroso
-N_Domains = 5
+N_Domains = 500
 shape = (50, 50)  # Tamanho da imagem (altura, largura)
 path_width = 5  # Largura dos caminhos (número de células)
 n_paths = 2  # Número de caminhos
 noise_level = 0.2  # Nível de ruído
 tortuosity = 1.5 # Nível de tortuosidade
+porosity = 0.5 # Nivel de tortuosidade
 show = True
 save_plot = True
 
@@ -32,16 +33,16 @@ minor_correlation_length = max(path_width/2, 1)  # Comprimento de correlação p
 for i in range(N_Domains):
     
     # Create the domain and reflect
-    midia_porosa = dc.create_media_fromTortuosity(shape, n_paths, path_width, noise_level, minor_correlation_length, tortuosity)
+    midia_porosa,_ = dc.create_media_fromPorousTortuosity_and_porosity(shape, n_paths, path_width, minor_correlation_length, tortuosity, porosity)
     midia_porosa_espelhada = dc.reflect_domain(midia_porosa)
     
     # Save it properly to LBPM
     simulation_name= simulation_base_name+"_"+str(i)
     
-    if show: plot_heatmap(midia_porosa_espelhada, folder_name="", simulation_name="TESTE", save=False, show=show)
+    if show: plot_heatmap(midia_porosa_espelhada, save=False, show=show)
     
     LBPM_runner.Save_Example(midia_porosa_espelhada, simulation_name, simulations_main_folder, plot=save_plot)
-"""
+
 
 
 # EXAMPLE METHOD 1: Create media to match porosity
@@ -87,10 +88,29 @@ plot_heatmap(midia_porosa_espelhada, folder_name="", simulation_name="Stochastic
 midia_porosa_espelhada = midia_porosa_espelhada.astype(np.uint8)
 """
 
-
-
-
+"""
 # EXAMPLE METHOD 3:
+# Parâmetros do meio poroso
+shape = (50, 50)  # Tamanho da imagem (altura, largura)
+path_width = 4  # Largura dos caminhoporosos (número de células)
+porosity = 0.4
+n_paths = 2  # Número de caminhos
+tortuosity = 1.5
+major_correlation_length = path_width  # Comprimento de correlação para criacao de caminhos principais
+minor_correlation_length = max(path_width/2, 1)  # Comprimento de correlação para arredondamento e micro-estruturas
+midia_porosa = dc.create_media_fromTortuosity_and_porosity(shape, path_width, minor_correlation_length, tortuosity, porosity)
+plot_heatmap(midia_porosa, folder_name="", simulation_name="Stochastic_Example_2", show=True)
+tortuosity_mean, tortuosidade_std = dc.calcula_tortuosidade(midia_porosa)
+print(f"Tortuosidade desejada: {tortuosity}\nTortuosidade resultante: {tortuosity_mean} +\-{tortuosidade_std*3} \n")
+midia_porosa_espelhada = dc.reflect_domain(midia_porosa)
+plot_heatmap(midia_porosa_espelhada, folder_name="", simulation_name="Stochastic_Example_2", show=True)
+midia_porosa_espelhada = midia_porosa_espelhada.astype(np.uint8)
+porosidade_result = dc.calcula_porosidade(midia_porosa)
+print(f"Porosidade desejada: {porosity}\nPorosidade resultante: {porosidade_result}\n")
+"""
+
+"""
+# EXAMPLE METHOD 4:
 # Parâmetros do meio poroso
 shape = (50, 50)  # Tamanho da imagem (altura, largura)
 path_width = 4  # Largura dos caminhos (número de células)
@@ -99,7 +119,7 @@ n_paths = 2  # Número de caminhos
 tortuosity = 1.5
 major_correlation_length = path_width  # Comprimento de correlação para criacao de caminhos principais
 minor_correlation_length = max(path_width/2, 1)  # Comprimento de correlação para arredondamento e micro-estruturas
-midia_porosa, midia_original = dc.combined_method(shape, n_paths, path_width, minor_correlation_length, tortuosity, porosity)
+midia_porosa, midia_original = dc.create_media_fromPorousTortuosity_and_porosity(shape, n_paths, path_width, minor_correlation_length, tortuosity, porosity)
 plot_heatmap(midia_porosa, folder_name="", simulation_name="Stochastic_Example_2", show=True)
 plot_heatmap(midia_original, folder_name="", simulation_name="Stochastic_Example_2", show=True)
 tortuosity_mean, tortuosidade_std = dc.calcula_tortuosidade(midia_porosa)
@@ -109,3 +129,4 @@ plot_heatmap(midia_porosa_espelhada, folder_name="", simulation_name="Stochastic
 midia_porosa_espelhada = midia_porosa_espelhada.astype(np.uint8)
 porosidade_result = dc.calcula_porosidade(midia_porosa)
 print(f"Porosidade desejada: {porosity}\nPorosidade resultante: {porosidade_result}\n")
+"""

@@ -122,6 +122,52 @@ def create_media_fromTortuosity(shape, n_paths, path_width=1, minor_correlation_
     return porous_media
 
 
+def create_media_fromTortuosity_and_porosity(shape, path_width, minor_correlation_length, tortuosity, porosity):
+
+    n_paths = int(np.ceil(porosity*shape[0]/path_width))
+    midia_tubos = create_media_fromTortuosity(shape, n_paths, path_width, minor_correlation_length, tortuosity)
+
+    return midia_tubos
+
+
+
+def create_media_fromPorousTortuosity_and_porosity(shape, n_paths, path_width=1, minor_correlation_length=2, tortuosity=1, porosity=0.5):
+    """
+    Gera uma mídia porosa sintética com grãos organizados ao redor dos caminhos gerados por create_media_fromTortuosity.
+    
+    Parâmetros:
+    - shape: tuple, formato da matriz gerada (ex: (100, 100)).
+    - n_paths: int, número de caminhos a serem criados.
+    - path_width: int, largura dos caminhos na mídia.
+    - minor_correlation_length: float, controle da suavização (filtro gaussiano).
+    - tortuosity: float, nível de tortuosidade dos caminhos.
+    - porosity: float, nível geral de porosidade (0.0 a 1.0).
+    
+    Retorna:
+    - binary_field: np.ndarray, matriz binária representando a mídia (1 = grão, 0 = poro).
+    """
+    
+    n_paths = int(np.ceil(porosity*shape[0]/path_width))
+    midia_tubos = create_media_fromTortuosity(shape, n_paths, path_width, minor_correlation_length, tortuosity)
+    
+    deviation = path_width//2
+    noise = np.random.normal(loc=0, scale=deviation, size=midia_tubos.shape)
+
+    # Add noise to the original array
+    modified_array = midia_tubos + noise
+
+    
+    # Etapa 4: Aplicação de filtro Gaussiano para criar granularidade
+    smoothed_field = gaussian_filter(modified_array, sigma=minor_correlation_length/1.25)
+    # Etapa 5: Normalização para intervalo [0, 1]
+    smoothed_field = (smoothed_field - smoothed_field.min()) / (smoothed_field.max() - smoothed_field.min())
+
+    # Passo 4: Segmentação binária (0 = sólido, 1 = poro)
+    binary_field = (smoothed_field > 0.5).astype(np.uint8)
+    
+    return binary_field,midia_tubos
+
+
 
 def draw_line_with_thickness(array, x0, y0, x1, y1, thickness):
     """
@@ -244,47 +290,3 @@ def calcula_porosidade(matriz, fluid_default_value=1):
 # FINALIZAR NOVOS METODOS ABAIXO
 
 
-"""
-def tortuosity_and_porosity()
-
-    n_paths = int(np.ceil(porosity*shape[0]/path_width))
-    midia_tubos = create_media_fromTortuosity(shape, n_paths, path_width, minor_correlation_length, tortuosity)
-"""
-
-
-
-def combined_method(shape, n_paths, path_width=1, minor_correlation_length=2, tortuosity=1, porosity=0.5):
-    """
-    Gera uma mídia porosa sintética com grãos organizados ao redor dos caminhos gerados por create_media_fromTortuosity.
-    
-    Parâmetros:
-    - shape: tuple, formato da matriz gerada (ex: (100, 100)).
-    - n_paths: int, número de caminhos a serem criados.
-    - path_width: int, largura dos caminhos na mídia.
-    - minor_correlation_length: float, controle da suavização (filtro gaussiano).
-    - tortuosity: float, nível de tortuosidade dos caminhos.
-    - porosity: float, nível geral de porosidade (0.0 a 1.0).
-    
-    Retorna:
-    - binary_field: np.ndarray, matriz binária representando a mídia (1 = grão, 0 = poro).
-    """
-    
-    n_paths = int(np.ceil(porosity*shape[0]/path_width))
-    midia_tubos = create_media_fromTortuosity(shape, n_paths, path_width, minor_correlation_length, tortuosity)
-    
-    deviation = path_width//2
-    noise = np.random.normal(loc=0, scale=deviation, size=midia_tubos.shape)
-
-    # Add noise to the original array
-    modified_array = midia_tubos + noise
-
-    
-    # Etapa 4: Aplicação de filtro Gaussiano para criar granularidade
-    smoothed_field = gaussian_filter(modified_array, sigma=minor_correlation_length/2)
-    # Etapa 5: Normalização para intervalo [0, 1]
-    smoothed_field = (smoothed_field - smoothed_field.min()) / (smoothed_field.max() - smoothed_field.min())
-
-    # Passo 4: Segmentação binária (0 = sólido, 1 = poro)
-    binary_field = (smoothed_field > 0.5).astype(np.uint8)
-    
-    return binary_field,midia_tubos

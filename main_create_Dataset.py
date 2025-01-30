@@ -8,7 +8,7 @@ from Utilities import plotter
 
 # INPUTS
 
-dataset_save_name = "Examples"
+dataset_save_name = "Examples_0"
 
 
     
@@ -19,8 +19,6 @@ with open("config.json" , "r") as json_file:
     config_loaded = json.load(json_file)
     
 simulations_main_folder = config_loaded["LBPM_IO_folder"]
-file_path_silo2vti_exe = config_loaded["silo2vti_exe_folder"]
-lbm_file_path = config_loaded["LBPM_installation_folder"]
 dataset_file_path = config_loaded["NN_dataset_folder"]
 raw_shape = config_loaded["raw_shape"]
 
@@ -30,7 +28,7 @@ folder_names = LBPM_runner.get_folder_names(simulations_main_folder, full_path=T
 
 data = []
 for examples_name in folder_names:
-
+    print(examples_name)
     # Find the highest .vti folder
     vis_folder = LBPM_runner.find_highest_vis_folder(examples_name)
     vti_filenames = LBPM_runner.get_vti_files(vis_folder, full_path=True)

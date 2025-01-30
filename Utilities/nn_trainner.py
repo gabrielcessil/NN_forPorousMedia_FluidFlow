@@ -86,7 +86,7 @@ def full_train(model, train_loader, valid_loader, loss_function, optimizer,N_epo
       if valid_avg_loss < best_valid_loss:
           best_valid_loss = valid_avg_loss
           # Define the path name
-          if include_time: model_path = file_name+"lowerValLoss_{}_{}.pth".format(timestamp, epoch_index)
+          if include_time: model_path = file_name+"lowerValLoss_{}.pth".format(timestamp)
           else: model_path = file_name
           torch.save(model.state_dict(), model_path)
          

@@ -125,13 +125,44 @@ class Data_from_Simulation():
 
 
 ### LOADING DATASET 
+def array_type_check(variable):
+    if isinstance(variable, list):  # Check if it's a list
+        return np.array(variable)  # Convert to numpy array
+    elif isinstance(variable, np.ndarray):  # Check if it's already an ndarray
+        return variable  # Return as is
+    else:
+        raise TypeError("Dataset samples must be a list or a numpy ndarray")
+        
+def check_shape_array(array, expected_shape):
+    # Check if the array is a numpy ndarray
+    if not isinstance(array, np.ndarray):
+        raise TypeError("Input must be a numpy ndarray")
 
-def get_input_output_tensors(file_path):
+    # Check the current shape of the array
+    current_shape = array.shape
+
+    # If the current shape is not as expected, try reshaping
+    if current_shape != expected_shape:
+        try:
+            reshaped_array = array.reshape(expected_shape)
+            return reshaped_array
+        except ValueError:
+            raise ValueError(f"Unexpected shape {current_shape} that cannot reshape to {expected_shape}")
+    
+    # Return the array if it already has the expected shape
+    return array
+
+def get_input_output_tensors(file_path, array_shape=(50,50)):
     """
     Processa os dados carregados e converte em tensores apropriados.
 
     Args:
-        loaded_dataset (list): Dados carregados de um arquivo.
+        file_path (str): Caminho para o arquivo .pt contendo os dados.
+        array_shape (tuple): Formato desejado para as imagens (ex: (50, 50)).
+
+    Retorna:
+        input_tensor_dataset (list): Lista de tensores de entrada (imagens).
+        output_tensors_dataset (list): Lista de tensores de saída.
     """
     loaded_dataset = torch.load(file_path)
 
@@ -139,18 +170,31 @@ def get_input_output_tensors(file_path):
     output_tensors_dataset = []
 
     for group in loaded_dataset:
-        media_rock,media_ux,media_uy = group[0], group[1], group[2]
+        media_rock, media_ux, media_uy = group[0], group[1], group[2]
         
-        media_rock = torch.from_numpy(media_rock).float().unsqueeze(0) # Flatten not used due the Conv2D input
+        # Convertendo para o tipo correto (ex: NumPy -> tensor)
+        media_rock = array_type_check(media_rock)
+        media_ux = array_type_check(media_ux)
+        media_uy = array_type_check(media_uy)
+
+        # Garantir o formato correto
+        media_rock = check_shape_array(media_rock, array_shape)
+        media_ux = check_shape_array(media_ux, array_shape)
+        media_uy = check_shape_array(media_uy, array_shape)
+
+        # Converte para tensores PyTorch
+        # Caso já seja um numpy array, basta apenas converter para tensor diretamente
+        media_rock = torch.tensor(media_rock).float().unsqueeze(0)  # Adiciona a dimensão do canal para Conv2D
+
+        # Para as saídas, mantemos os arrays achatados
+        media_ux = torch.tensor(media_ux.flatten()).float()  # Flatten para saída Linear
+        media_uy = torch.tensor(media_uy.flatten()).float()  # Flatten para saída Linear
         
-        media_ux =  torch.from_numpy(media_ux.flatten()).float()#.unsqueeze(0) # Flatten used due the Linear output
-        media_uy = torch.from_numpy(media_uy.flatten()).float()#.unsqueeze(0) # Flatten used due the Linear output
-        
+        # Adicionando aos datasets
         input_tensor_dataset.append(media_rock)
         output_tensors_dataset.append(media_ux)
 
     return input_tensor_dataset, output_tensors_dataset
-    
 class TensorsDataset(Dataset):
     def __init__(self, inputs, outputs):
         
@@ -185,6 +229,7 @@ class TensorsDataset(Dataset):
 
     def get_dataloaders(self, train_ratio=0.7, val_ratio=0.15, batch_size=10):
         train_dataset, val_dataset, test_dataset = self.split(train_ratio=train_ratio, val_ratio=val_ratio) # Split into train, validation, and test sets
+        
         train_loader = DataLoader(train_dataset, batch_size=batch_size, shuffle=True)  # For trainin
         val_loader = DataLoader(val_dataset, batch_size=batch_size, shuffle=True)  # For validation
         test_loader = DataLoader(test_dataset, batch_size=batch_size, shuffle=True)  # For testing

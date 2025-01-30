@@ -182,8 +182,8 @@ def plot_3d_planes(array_3d, x_offset=0., y_offset=0., z_offset=0., file_name="3
 
 def plot_heatmap(
     array_2d, 
-    folder_name, 
-    simulation_name,
+    folder_name="", 
+    simulation_name="Example",
     colormap='viridis', 
     xlabel='X-axis', 
     ylabel='Y-axis', 
@@ -219,7 +219,7 @@ def plot_heatmap(
     plt.title(title)
     plt.tight_layout()
     full_file_path = os.path.join(folder_name, simulation_name+".png")
-    plt.savefig(full_file_path, dpi=dpi)
+    if save: plt.savefig(full_file_path, dpi=dpi)
     if show: plt.show()
     plt.close('all')
     gc.collect()
