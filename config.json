@@ -2,10 +2,6 @@
     "LBPM_IO_folder": "/home/gabriel/Desktop/Dissertacao/LBPM_Results/",
     "NN_dataset_folder": "/home/gabriel/Desktop/Dissertacao/NN_Datasets/",
     "NN_model_weights_folder": "/home/gabriel/Desktop/Dissertacao/NN_Model_Weights/",
-    "raw_shape": [
-        50,
-        50
-    ],
-    "LBPM_installation_folder": "/home/gabriel/Desktop/LBPM_Install/",
-    "silo2vti_exe_folder": ""
+    "Rock_shape": [1, 50,100],
+    "LBPM_installation_folder": "/home/gabriel/Desktop/LBPM_Install/"
 }

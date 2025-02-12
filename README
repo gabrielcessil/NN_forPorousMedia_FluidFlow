@@ -2,4 +2,32 @@ This are the initial steps of my dissertation project that aims to predict fluid
 
 My initial work is inspired on the MS-NET (link here: https://github.com/je-santos/ms_net).
 
-To save time on initial validations, the current state of my work is trying to overfit one single LBM simulation.
+Content:
+
+config.json:
+
+    Fill the content to match your folders structure:
+
+    "LBPM_IO_folder": Main folder of LBM simulations
+    "NN_dataset_folder": Main folder of .pt datasets
+    "NN_model_weights_folder": Main folder of trained model weights
+    "Rock_shape": Domain shape [Depth(Channels), Hight(Row), Lenght(Columns)]
+    "LBPM_installation_folder": Main folder of LBPM installation
+
+    ALL PATHS MUST END WITH '/'
+environment.yml:
+
+    Environment dependencies, use it to create conda.
+
+main_create_StochasticPlane.py:
+
+    Create domains and save into .raw
+
+main_create_Simulations.py:
+
+    Read .raw data and run LBPM to create simulations as .vti
+
+main_create_Dataset.py:
+
+    Read and concatenate .vti files as Dataset .pt
+
