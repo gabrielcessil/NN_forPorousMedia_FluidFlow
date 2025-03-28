@@ -1,4 +1,4 @@
-name: meu_ambiente
+name: new_env
 channels:
   - pytorch
   - plotly
