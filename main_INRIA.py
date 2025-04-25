@@ -11,7 +11,8 @@ from torch.utils.data import Dataset
 import os
 import pandas as pd
 from PIL import Image
-
+from torch.optim.lr_scheduler import LambdaLR
+import numpy as np
 
 
 
@@ -19,21 +20,25 @@ from PIL import Image
 #************ USER INPUTS: Hyperparameters ***********#
 #######################################################
 
-batch_size = 10
-max_samples = 3
-train_ratio = 0.7
-val_ratio = 0.15
-learning_rate = 0.1
-N_epochs = 3000
+max_samples = 3 # Total samples loaded
+val_ratio = 0.15 # Fraction of max_samples used to validate
+train_ratio = 0.7 # Fraction of max_samples used to train 
+batch_size = 10 # Group size of train samples that influence one update on weights
+learning_rate = 0.15 # 
+N_epochs = 800 # Number of times that all the samples are visited
 model_name = "Model" # The desired model name, avoid overwritting previous models
 loss_functions = {
     "MSE":  {"obj":     nn.MSELoss(),"Thresholded": False},
     "L1":   {"obj":     nn.L1Loss(), "Thresholded": False},
+    #"Masked MSE (Neg. 0's target cells)": {"obj": lf.Mask_LossFunction(nn.L1Loss()), "Thresholded": False},
+    "Binary Cross-Entropy": {"obj": lf.Custom_BCE(), "Thresholded": False},
+                             
     "Complementary MIOU": {"obj":     lf.CustomLoss_MIOU(),"Thresholded": True},
-    "Complementary Accuracy": {"obj": lf.CustomLoss_Accuracy(),"Thresholded": True}
-    }
-earlyStopping_loss = "Complementary Accuracy"
-backPropagation_loss = "MSE"
+    "Complementary Accuracy": {"obj": lf.CustomLoss_Accuracy(),"Thresholded": True},
+}
+    
+earlyStopping_loss = "Complementary MIOU" # Which listed loss_function is used to stop trainning
+backPropagation_loss = "MSE" # Which listed loss_function is used to calculate weighs
 
 
 
@@ -48,107 +53,16 @@ examples_shape = config_loaded["Rock_shape"]
 NN_dataset_folder = config_loaded["NN_dataset_folder"]
 NN_model_weights_folder = config_loaded["NN_model_weights_folder"]
 model_full_name = NN_model_weights_folder+model_name
+metadata_file_name = "/home/gabriel/Desktop/Dissertacao/NN_Results/Metadata/"
 
 
 
 #######################################################
-#**** CUSTOMIZATION TO DEAL WITH DATASET STRUCTURE ***#
+#************ LOADING DATA ***************************#
 #######################################################
-from torchvision import transforms
-
-class ForestSegmentationData(Dataset):
-
-    def __init__(self, dataset_path, examples_shape):
-        csv_file = os.path.join(dataset_path, "meta_data.csv")
-        img_dir = os.path.join(dataset_path, "images")
-        mask_dir = os.path.join(dataset_path, "masks")
-
-        transform = transforms.Compose([
-            transforms.Resize((examples_shape[1],examples_shape[2])),  # Padronizar tamanho
-            transforms.ToTensor() # Converter para tensor
-        ])
-        
-        self.data = pd.read_csv(csv_file)
-        self.img_dir = img_dir
-        self.mask_dir = mask_dir
-        self.transform = transform
-        self.inputs = []
-        self.outputs = []
-        self.load_data()
-
-    def __len__(self):
-        return len(self.inputs)
-
-    def __getitem__(self, idx):
-        return self.inputs[idx], self.outputs[idx]
-
-    def load_data(self):
-        for idx in range(len(self.data)):
-            img_path = os.path.join(self.img_dir, self.data.iloc[idx, 0])
-            mask_path = os.path.join(self.mask_dir, self.data.iloc[idx, 1])
-
-            image = Image.open(img_path).convert("RGB")
-            mask = Image.open(mask_path).convert("L")
-
-            if self.transform:
-                image = self.transform(image)
-                mask = self.transform(mask)
-
-            self.inputs.append(image)
-            self.outputs.append(mask)
-
-        self.inputs = torch.stack(self.inputs)
-        self.outputs = torch.stack(self.outputs)
-    
-
-class AerialSegmentationData(Dataset):
-    def __init__(self, dataset_path, examples_shape):
-        img_dir = os.path.join(dataset_path, "images")
-        mask_dir = os.path.join(dataset_path, "gt")
-
-        self.transform = transforms.Compose([
-            transforms.Resize((examples_shape[1], examples_shape[2])),  
-            transforms.ToTensor()
-        ])
-
-        self.img_dir = img_dir
-        self.mask_dir = mask_dir
-        self.inputs = []
-        self.outputs = []
-        self.load_data()
-
-    def __len__(self):
-        return len(self.inputs)
-
-    def __getitem__(self, idx):
-        return self.inputs[idx], self.outputs[idx]
-
-    def load_data(self):
-        img_files = sorted(os.listdir(self.img_dir))
-        mask_files = sorted(os.listdir(self.mask_dir))
-
-        assert len(img_files) == len(mask_files), "Mismatch between images and masks"
-
-        for img_file, mask_file in zip(img_files, mask_files):
-            img_path = os.path.join(self.img_dir, img_file)
-            mask_path = os.path.join(self.mask_dir, mask_file)
-
-            image = Image.open(img_path).convert("RGB")
-            mask = Image.open(mask_path).convert("L")
-
-            if self.transform:
-                image = self.transform(image)
-                mask = self.transform(mask)
-
-            self.inputs.append(image)
-            self.outputs.append(mask)
-
-        self.inputs = torch.stack(self.inputs)
-        self.outputs = torch.stack(self.outputs)
         
 # Segmentation Benchmarks:https://paperswithcode.com/task/semantic-segmentation
-# Original content: https://project.inria.fr/aerialimagelabeling/files/
-# Dataset's Benchmark: https://paperswithcode.com/sota/semantic-segmentation-on-inria-aerial-image
+
 
 ## Example 1: FOREST SEGMENTATION
 """
@@ -159,26 +73,25 @@ path = "/home/gabriel/.cache/kagglehub/datasets/quadeer15sh/augmented-forest-seg
 dataset_path = path+"/Forest Segmented/Forest Segmented/"
 examples_shape = [3, 256, 256]
 output_shape = [1, 256, 256]
-data = ForestSegmentationData(dataset_path, examples_shape)
 def make_binary_int(a): return (a > 0.5).int() # Make it binary
 output_masks = [make_binary_int]
+data = dr.ForestSegmentationData(dataset_path, examples_shape)
 """
 
 
 ## Example 2: INRIA SEGMENTATION
+# Original content: https://project.inria.fr/aerialimagelabeling/files/
+# Original dataset's paper: https://inria.hal.science/hal-01468452
+# Dataset's Benchmark: https://paperswithcode.com/sota/semantic-segmentation-on-inria-aerial-image
+# Related works: 
+# - U-net: http://arxiv.org/pdf/1912.09216v1
+# - Transformers: https://ieeexplore.ieee.org/stamp/stamp.jsp?tp=&arnumber=10108049
 dataset_path = "/home/gabriel/Downloads/AerialLabelling/AerialImageDataset_01/train/"
-examples_shape = [3, 500, 500]
-output_shape = [1, 500, 500]
-data = AerialSegmentationData(dataset_path, examples_shape)
-def make_binary_int(a): return (a > 0).int() # Make it binary
-output_masks = [make_binary_int]
-
-
-
-
-#######################################################
-#************ COMPUTATIONS ***************************#
-#######################################################d
+examples_shape = [3, 1000, 1000]
+output_shape = [1, 1000, 1000]
+data = dr.AerialSegmentationData(dataset_path, examples_shape)
+def make_binary_int(a): return (a > 0.5).int() # Make it binary
+output_masks = [make_binary_int] # Mask for binary classification
 
 # CREATING DATALOADER
 input_tensors = data.inputs
@@ -211,12 +124,42 @@ print(f" - Training samples per batch: {batch_inputs.shape[0]}")  # Correct batc
 
 
 
+#######################################################
+#************ CREATING MODEL *************************#
+#######################################################
+
 # CREATING MODEL
-model = incp.MODEL(
-    in_shape=input_shape,  # (C, H, W)
-    out_shape=output_shape,  # (C, H, W)
-    output_masks=output_masks
-)
+
+"""
+model = incp.MULTI_BLOCK_MODEL_2(
+            in_shape=input_shape, # input shape 
+            out_shape=output_shape, # output shape
+            min_size=2, # the depth of the architecture, equal to the number of image contractions
+            output_masks=output_masks, # mask not included to train weighs (ex: binarization)
+            enc_decay=2, # the rate of image contraction in image length
+            add_channels=6, # the number of channels added from block to block
+            estimative_signal=False) # if estimative is provided in 
+"""
+"""
+model = incp.BLOCK_2(
+    in_shape=input_shape,
+    out_shape=output_shape,
+    output_masks=output_masks)
+"""
+
+model = incp.INCEPTION_MODEL(
+    in_shape=input_shape,
+    out_shape=output_shape,
+    output_masks=output_masks,
+    b1_out_channels=10,
+    b2_mid_channels=5,
+    b2_out_channels=10,
+    b3_mid_channels=5,
+    b3_out_channels=10,
+    b4_out_channels=10,
+    tail_kernel_size = 1)
+
+
 
 
 # RUNNING EXAMPLE WITHOUT TRAINNING
@@ -224,21 +167,36 @@ nnt.Run_Example(model, train_loader,loss_functions, earlyStopping_loss, i_exampl
 nnt.Run_Example(model, test_loader,loss_functions, earlyStopping_loss, i_example=0, title="Test sample (without trainning)")
 
 
+
+
+#######################################################
+#************ COMPUTATIONS ***************************#
+#######################################################
+
+
+    
 #### MODEL TRAINNING
-optimizer = torch.optim.SGD(model.parameters(), lr=learning_rate)
+#optimizer = torch.optim.SGD(model.parameters(), lr=learning_rate)
+optimizer = torch.optim.Adam(model.parameters(), lr=learning_rate)
+scheduler_period = N_epochs/2
+lr_lambda = lambda epoch: 1 + 0.1 * np.sin(2 * np.pi * epoch / scheduler_period) # Multiplier of initial learning rate
+scheduler = LambdaLR(optimizer, lr_lambda) # Optimizer handler, being able to update/schedule learning rates
 
-model_paths, train_costs_history, val_costs_history = nnt.full_train(
-                                                            model,
-                                                            train_loader,
-                                                            val_loader,                    
-                                                            loss_functions,                                      
-                                                            earlyStopping_loss,
-                                                            backPropagation_loss,
-                                                            optimizer,
-                                                            N_epochs=N_epochs,
-                                                            file_name=model_full_name)
+model_paths, train_ch, val_ch, metadata = nnt.full_train(
+                                                model,
+                                                train_loader,
+                                                val_loader,                    
+                                                loss_functions,                                      
+                                                earlyStopping_loss,
+                                                backPropagation_loss,
+                                                optimizer,
+                                                scheduler=None,
+                                                N_epochs=N_epochs,
+                                                weights_file_name=model_full_name,
+                                                metadata_file_name=metadata_file_name,
+                                                )
 
-nnt.Plot_Validation(train_costs_history, val_costs_history)
+nnt.Plot_Validation(train_ch, val_ch)
 
 
 
