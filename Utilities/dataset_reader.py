@@ -1,5 +1,9 @@
 import torch
 import numpy as np
+from torch.utils.data import Dataset
+import os
+import pandas as pd
+from PIL import Image
 
 class LBM_Dataset_Processor:
     """
@@ -63,7 +67,7 @@ class LBM_Dataset_Processor:
 
     def load_data(self):
         """Loads and processes the dataset into tensors."""
-        dataset = torch.load(self.file_path)
+        dataset = torch.load(self.file_path, weights_only=False)
         
         inputs = []
         outputs = []
@@ -86,3 +90,99 @@ class LBM_Dataset_Processor:
     def get_tensors(self):
         """Returns the processed input and output tensors."""
         return self.inputs, self.outputs
+
+
+#######################################################
+#**** CUSTOMIZATION TO DEAL WITH DATASET STRUCTURE ***#
+#######################################################
+from torchvision import transforms
+
+class ForestSegmentationData(Dataset):
+
+    def __init__(self, dataset_path, examples_shape):
+        csv_file = os.path.join(dataset_path, "meta_data.csv")
+        img_dir = os.path.join(dataset_path, "images")
+        mask_dir = os.path.join(dataset_path, "masks")
+
+        transform = transforms.Compose([
+            transforms.Resize((examples_shape[1],examples_shape[2])),  # Padronizar tamanho
+            transforms.ToTensor() # Converter para tensor
+        ])
+        
+        self.data = pd.read_csv(csv_file)
+        self.img_dir = img_dir
+        self.mask_dir = mask_dir
+        self.transform = transform
+        self.inputs = []
+        self.outputs = []
+        self.load_data()
+
+    def __len__(self):
+        return len(self.inputs)
+
+    def __getitem__(self, idx):
+        return self.inputs[idx], self.outputs[idx]
+
+    def load_data(self):
+        for idx in range(len(self.data)):
+            img_path = os.path.join(self.img_dir, self.data.iloc[idx, 0])
+            mask_path = os.path.join(self.mask_dir, self.data.iloc[idx, 1])
+
+            image = Image.open(img_path).convert("RGB")
+            mask = Image.open(mask_path).convert("L")
+
+            if self.transform:
+                image = self.transform(image)
+                mask = self.transform(mask)
+
+            self.inputs.append(image)
+            self.outputs.append(mask)
+
+        self.inputs = torch.stack(self.inputs)
+        self.outputs = torch.stack(self.outputs)
+    
+
+class AerialSegmentationData(Dataset):
+    def __init__(self, dataset_path, examples_shape):
+        img_dir = os.path.join(dataset_path, "images")
+        mask_dir = os.path.join(dataset_path, "gt")
+
+        self.transform = transforms.Compose([
+            transforms.Resize((examples_shape[1], examples_shape[2])),  
+            transforms.ToTensor()
+        ])
+
+        self.img_dir = img_dir
+        self.mask_dir = mask_dir
+        self.inputs = []
+        self.outputs = []
+        self.load_data()
+
+    def __len__(self):
+        return len(self.inputs)
+
+    def __getitem__(self, idx):
+        return self.inputs[idx], self.outputs[idx]
+
+    def load_data(self):
+        img_files = sorted(os.listdir(self.img_dir))
+        mask_files = sorted(os.listdir(self.mask_dir))
+
+        assert len(img_files) == len(mask_files), "Mismatch between images and masks"
+
+        for img_file, mask_file in zip(img_files, mask_files):
+            img_path = os.path.join(self.img_dir, img_file)
+            mask_path = os.path.join(self.mask_dir, mask_file)
+
+            image = Image.open(img_path).convert("RGB")
+            mask = Image.open(mask_path).convert("L")
+
+            if self.transform:
+                image = self.transform(image)
+                mask = self.transform(mask)
+
+            self.inputs.append(image)
+            self.outputs.append(mask)
+
+        self.inputs = torch.stack(self.inputs)
+        self.outputs = torch.stack(self.outputs)

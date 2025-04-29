@@ -5,7 +5,7 @@ from Utilities import loss_functions as lf
 from Utilities import nn_trainner as nnt
 from Utilities import model_handler as mh
 from Utilities import loader_creator as lc
-from Architectures import Inception_v3 as incp
+from Architectures import Models as md
 from Utilities import dataset_reader as dr
 from torch.utils.data import Dataset
 import os
@@ -24,8 +24,9 @@ max_samples = 3 # Total samples loaded
 val_ratio = 0.15 # Fraction of max_samples used to validate
 train_ratio = 0.7 # Fraction of max_samples used to train 
 batch_size = 10 # Group size of train samples that influence one update on weights
-learning_rate = 0.15 # 
-N_epochs = 800 # Number of times that all the samples are visited
+learning_rate = 0.015 # 
+momentum = 0.9 
+N_epochs = 100 # Number of times that all the samples are visited
 model_name = "Model" # The desired model name, avoid overwritting previous models
 loss_functions = {
     "MSE":  {"obj":     nn.MSELoss(),"Thresholded": False},
@@ -60,26 +61,9 @@ metadata_file_name = "/home/gabriel/Desktop/Dissertacao/NN_Results/Metadata/"
 #######################################################
 #************ LOADING DATA ***************************#
 #######################################################
-        
-# Segmentation Benchmarks:https://paperswithcode.com/task/semantic-segmentation
 
 
-## Example 1: FOREST SEGMENTATION
-"""
-#import kagglehub
-#path = kagglehub.dataset_download("quadeer15sh/augmented-forest-segmentation")
-#print("Path to dataset files:", path)
-path = "/home/gabriel/.cache/kagglehub/datasets/quadeer15sh/augmented-forest-segmentation/versions/2/"
-dataset_path = path+"/Forest Segmented/Forest Segmented/"
-examples_shape = [3, 256, 256]
-output_shape = [1, 256, 256]
-def make_binary_int(a): return (a > 0.5).int() # Make it binary
-output_masks = [make_binary_int]
-data = dr.ForestSegmentationData(dataset_path, examples_shape)
-"""
-
-
-## Example 2: INRIA SEGMENTATION
+## Example: INRIA SEGMENTATION
 # Original content: https://project.inria.fr/aerialimagelabeling/files/
 # Original dataset's paper: https://inria.hal.science/hal-01468452
 # Dataset's Benchmark: https://paperswithcode.com/sota/semantic-segmentation-on-inria-aerial-image
@@ -87,8 +71,8 @@ data = dr.ForestSegmentationData(dataset_path, examples_shape)
 # - U-net: http://arxiv.org/pdf/1912.09216v1
 # - Transformers: https://ieeexplore.ieee.org/stamp/stamp.jsp?tp=&arnumber=10108049
 dataset_path = "/home/gabriel/Downloads/AerialLabelling/AerialImageDataset_01/train/"
-examples_shape = [3, 1000, 1000]
-output_shape = [1, 1000, 1000]
+examples_shape = [3, 2048, 2048]
+output_shape = [1, 2048, 2048]
 data = dr.AerialSegmentationData(dataset_path, examples_shape)
 def make_binary_int(a): return (a > 0.5).int() # Make it binary
 output_masks = [make_binary_int] # Mask for binary classification
@@ -130,38 +114,42 @@ print(f" - Training samples per batch: {batch_inputs.shape[0]}")  # Correct batc
 
 # CREATING MODEL
 
-"""
-model = incp.MULTI_BLOCK_MODEL_2(
+
+model = md.RockAware_UNet(
             in_shape=input_shape, # input shape 
             out_shape=output_shape, # output shape
-            min_size=2, # the depth of the architecture, equal to the number of image contractions
+            min_size=256, # the depth of the architecture, equal to the number of image contractions
             output_masks=output_masks, # mask not included to train weighs (ex: binarization)
             enc_decay=2, # the rate of image contraction in image length
             add_channels=6, # the number of channels added from block to block
             estimative_signal=False) # if estimative is provided in 
+
+print("Model is allocated.")
+
+
 """
-"""
-model = incp.BLOCK_2(
+model = md.BLOCK_2(
     in_shape=input_shape,
     out_shape=output_shape,
     output_masks=output_masks)
 """
 
-model = incp.INCEPTION_MODEL(
+"""
+model = md.INCEPTION_MODEL(
     in_shape=input_shape,
     out_shape=output_shape,
     output_masks=output_masks,
-    b1_out_channels=10,
+    b1_out_channels=20,
     b2_mid_channels=5,
-    b2_out_channels=10,
+    b2_out_channels=20,
     b3_mid_channels=5,
-    b3_out_channels=10,
-    b4_out_channels=10,
+    b3_out_channels=20,
+    b4_out_channels=20,
     tail_kernel_size = 1)
+"""
 
 
-
-
+"""
 # RUNNING EXAMPLE WITHOUT TRAINNING
 nnt.Run_Example(model, train_loader,loss_functions, earlyStopping_loss, i_example=0, title="Train sample (without trainning)")
 nnt.Run_Example(model, test_loader,loss_functions, earlyStopping_loss, i_example=0, title="Test sample (without trainning)")
@@ -176,8 +164,7 @@ nnt.Run_Example(model, test_loader,loss_functions, earlyStopping_loss, i_example
 
     
 #### MODEL TRAINNING
-#optimizer = torch.optim.SGD(model.parameters(), lr=learning_rate)
-optimizer = torch.optim.Adam(model.parameters(), lr=learning_rate)
+optimizer = torch.optim.SGD(model.parameters(), lr=learning_rate,  momentum=momentum)
 scheduler_period = N_epochs/2
 lr_lambda = lambda epoch: 1 + 0.1 * np.sin(2 * np.pi * epoch / scheduler_period) # Multiplier of initial learning rate
 scheduler = LambdaLR(optimizer, lr_lambda) # Optimizer handler, being able to update/schedule learning rates
@@ -208,3 +195,4 @@ nnt.Run_Example(model, test_loader,loss_functions, earlyStopping_loss, i_example
 
 ### DELETE MODEL AFTER USING IT
 mh.delete_model(model)
+"""

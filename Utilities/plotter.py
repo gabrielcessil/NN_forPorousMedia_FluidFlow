@@ -229,9 +229,34 @@ def plot_heatmap(
     plt.close('all')
     gc.collect()
     
-import matplotlib.pyplot as plt
-import torch
 
+# Convert tensors to NumPy and move to CPU if necessary
+def to_numpy(tensor):
+    if isinstance(tensor, torch.Tensor) :
+        return tensor.cpu().numpy()
+    return tensor
+    
+def display_image_tensor(tensor, filename):
+    img = to_numpy(tensor)
+
+    # (C, H, W) → (H, W, C)
+    if img.ndim == 3 and img.shape[0] in [1, 3]:
+        img = np.transpose(img, (1, 2, 0))
+
+    height, width = img.shape[:2]
+
+    # Set figure size to exactly match the image pixel dimensions
+    dpi = 100  # or any dpi you want
+    figsize = (width / dpi, height / dpi)
+
+    fig = plt.figure(figsize=figsize, dpi=dpi)
+    ax = fig.add_axes([0, 0, 1, 1])  # fill entire figure
+    ax.imshow(img)
+    ax.axis('off')
+
+    fig.savefig(filename + ".png", dpi=dpi)
+    plt.close(fig)
+    
 def display_example(image_tensor, pred_tensor, target_tensor,
                     title="Example", title_image="Input", title_pred="Prediction", title_target="Target"):
     """
@@ -246,11 +271,7 @@ def display_example(image_tensor, pred_tensor, target_tensor,
     print("pred_tensor shape: ", pred_tensor.shape)
     print("target_tensor shape: ", target_tensor.shape)
 
-    # Convert tensors to NumPy and move to CPU if necessary
-    def to_numpy(tensor):
-        if isinstance(tensor, torch.Tensor):
-            return tensor.cpu().numpy()
-        return tensor
+
 
     image_tensor = to_numpy(image_tensor)
     pred_tensor = to_numpy(pred_tensor)

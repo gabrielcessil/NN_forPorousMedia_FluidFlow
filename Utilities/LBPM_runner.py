@@ -255,7 +255,8 @@ def run_commands_in_directory(commands):
 def Run_Example(simulations_main_folder,
                  simulation_name,
                  lbm_file_path,
-                 lbm_functional="lbpm_permeability_simulator"):
+                 lbm_functional="lbpm_permeability_simulator",
+                 mpi_file_path=None):
     """
     Main function to run the LBM simulation and convert SILO files.
 
@@ -273,16 +274,19 @@ def Run_Example(simulations_main_folder,
     file_path_simulation = os.path.join(simulations_main_folder, simulation_name)
 
     # Run LBPM: vis folder will be created
-    lbm_command = f"{lbm_file_path}mpi/bin/mpirun -np 1 {lbm_file_path}/LBPM_dir/tests/{lbm_functional} {simulation_name}.db"
+    if mpi_file_path is None: # Assume same path for MPI
+        lbm_command = f"{lbm_file_path}mpi/bin/mpirun -np 1 {lbm_file_path}LBPM_dir/tests/{lbm_functional} {simulation_name}.db"
+    else:
+        lbm_command = f"{mpi_file_path}bin/mpirun -np 1 {lbm_file_path}LBPM_dir/tests/{lbm_functional} {simulation_name}.db"
     run_commands_in_directory({file_path_simulation: lbm_command})
     
     # Join the right vis folder
-    vis_folder_path = find_highest_vis_folder(file_path_simulation)
-    vis_folder = os.path.join(file_path_simulation, vis_folder_path)
+    #vis_folder_path = find_highest_vis_folder(file_path_simulation)
+    #vis_folder = os.path.join(file_path_simulation, vis_folder_path)
     
     # Convert silo output to vti
-    silo2vti_command = f"{lbm_file_path}converter_silo_vti/silo2vti summary.silo output.pvti"
-    run_commands_in_directory({vis_folder: silo2vti_command})
+    #silo2vti_command = f"{lbm_file_path}converter_silo_vti/silo2vti summary.silo output.pvti"
+    #run_commands_in_directory({vis_folder: silo2vti_command})
     
 
 def Save_Example(domain, simulation_name, simulations_main_folder, plot=False):
