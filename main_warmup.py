@@ -26,22 +26,24 @@ max_samples = 3 # Total samples loaded
 val_ratio = 0.15 # Fraction of max_samples used to validate
 train_ratio = 0.7 # Fraction of max_samples used to train 
 batch_size = 10 # Group size of train samples that influence one update on weights
-learning_rate = 0.015 # 
+learning_rate = 0.035 # 
 momentum = 0.9 
-N_epochs = 100 # Number of times that all the samples are visited
+N_epochs = 300 # Number of times that all the samples are visited
 model_name = "Inception" # The desired model name, avoid overwritting previous models
 loss_functions = {
+    
+    # Continuous output metrics
     "MSE":  {"obj":     nn.MSELoss(),"Thresholded": False},
     "L1":   {"obj":     nn.L1Loss(), "Thresholded": False},
-    #"Masked MSE (Neg. 0's target cells)": {"obj": lf.Mask_LossFunction(nn.L1Loss()), "Thresholded": False},
     "Binary Cross-Entropy": {"obj": lf.Custom_BCE(), "Thresholded": False},
                              
-    "Complementary MIOU": {"obj":     lf.CustomLoss_MIOU(),"Thresholded": True},
+    # Binarized output metrics
     "Complementary Accuracy": {"obj": lf.CustomLoss_Accuracy(),"Thresholded": True},
+    "Complementary IOU":{"obj": lf.CustomLoss_IOU(), "Thresholded": True}
 }
     
-earlyStopping_loss = "Complementary MIOU" # Which listed loss_function is used to stop trainning
-backPropagation_loss = "MSE" # Which listed loss_function is used to calculate weighs
+earlyStopping_loss = "Complementary IOU" # Which listed loss_function is used to stop trainning
+backPropagation_loss = "Complementary IOU" # Which listed loss_function is used to calculate weighs
 
 
 

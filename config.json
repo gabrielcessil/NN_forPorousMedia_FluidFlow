@@ -2,6 +2,6 @@
     "LBPM_IO_folder": "/home/gabriel/Desktop/Dissertacao/LBPM_Results/",
     "NN_dataset_folder": "/home/gabriel/Desktop/Dissertacao/NN_Datasets/",
     "NN_model_weights_folder": "/home/gabriel/Desktop/Dissertacao/NN_Model_Weights/",
-    "Rock_shape": [1, 50,100],
+    "Rock_shape": [1, 250, 250], 
     "LBPM_installation_folder": "/home/gabriel/Desktop/LBPM_Install/"
 }
