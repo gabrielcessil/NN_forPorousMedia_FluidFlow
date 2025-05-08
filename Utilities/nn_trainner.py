@@ -10,11 +10,15 @@ from Utilities import usage_metrics as um
 from Utilities import plotter
         
 
-def train_one_epoch(model, train_loader, loss_function, optimizer, scheduler):
+def train_one_epoch(model, train_loader, loss_function, optimizer, scheduler, device='cpu'):
     model.train()
 
     # Para cada batch
     for batch_inputs, batch_labels in train_loader:
+        
+        # Load data on device
+        batch_inputs = batch_inputs.to(device)
+        batch_labels = batch_labels.to(device)
         
         # REALIZA BATCH:
         optimizer.zero_grad() # Reinicia os gradientes para calculo do passo dos pesos
@@ -22,10 +26,15 @@ def train_one_epoch(model, train_loader, loss_function, optimizer, scheduler):
         loss = loss_function["obj"](batch_outputs, batch_labels) # Calcula Custo
         loss.backward() # Calcula gradiente em relacao do Custo
         optimizer.step() # Realiza um passo dos pesos
+        
         if not scheduler is None: scheduler.step() # Realiza um passo no learning rate
     return  model
 
-def get_loader_loss(model, loader, loss_functions):
+def validate_one_epoch(model, train_loader, valid_loader, loss_functions):
+    return get_loader_loss(model, train_loader, loss_functions), get_loader_loss(model, valid_loader, loss_functions)
+    
+
+def get_loader_loss(model, loader, loss_functions, device='cpu'):
     
     results = {loss_name: 0.0 for loss_name in loss_functions}
     
@@ -34,9 +43,12 @@ def get_loader_loss(model, loader, loss_functions):
       model.eval() # Entre em modo avaliacao, desabilitando funcoes exclusivas de treinamento (ex:Dropout)
       
       for inputs, labels in loader:
-         
+          
+          # Load data on device
+          inputs = inputs.to(device)
+          labels = labels.to(device)
+    
           for loss_name, loss_function in loss_functions.items():
-              
               
               # Gera a saida do modelo atual
               if loss_function["Thresholded"]: outputs = model.predict(inputs)
@@ -53,9 +65,7 @@ def get_loader_loss(model, loader, loss_functions):
 
     return results
 
-def validate_one_epoch(model, train_loader, valid_loader, loss_functions):
-    return get_loader_loss(model, train_loader, loss_functions), get_loader_loss(model, valid_loader, loss_functions)
-    
+
     
 def verify_memory(model, in_shape, batch_size, device, dtype=torch.float32):
     current_memory = um.check_memory(device=device)
@@ -84,26 +94,28 @@ def full_train(model,
                include_time=False, 
                device="cpu"):
     
+    # Get inputs and targets
     inputs, targets = next(iter(train_loader))    
     in_shape = (inputs.shape[1],inputs.shape[2],inputs.shape[3]) #(C,H,W)
     batch_size = inputs.shape[0]
     
     verify_memory(model, in_shape, batch_size, device, dtype=torch.float32)
     
+    # Initialize tracking
     timestamp = datetime.now().strftime('%d%m%Y_%H%M%S')
     train_costs_history = []
     val_costs_history = []
     best_valid_loss = np.inf    
     best_model_path = weights_file_name+"lowerValLoss.pth"
     model_paths = [best_model_path]
-
+    progress_points = set(int(N_epochs * i / 100) for i in range(5, 101, 5))  
     
-
-    progress_points = set(int(N_epochs * i / 100) for i in range(5, 101, 5))  # Define os pontos de 5% a 100%
     
+    
+    # Trainning process
     for epoch_index in range(N_epochs):
         
-    
+        # Learn updating model
         model = train_one_epoch( 
             model=model,
             train_loader=train_loader,
@@ -111,6 +123,7 @@ def full_train(model,
             optimizer=optimizer,
             scheduler=scheduler)
         
+        # Get learning metrics
         train_avg_loss, valid_avg_loss = validate_one_epoch(
                                               model=model, 
                                               train_loader=train_loader,
@@ -120,15 +133,12 @@ def full_train(model,
         train_costs_history.append(train_avg_loss)
         val_costs_history.append(valid_avg_loss)
         
-        # Track best performance, and save the model's state
+        # Save tracking based on best performance
         if valid_avg_loss[earlyStopping_loss]< best_valid_loss:
             best_valid_loss = valid_avg_loss[earlyStopping_loss]
-            # Define the path name
             torch.save(model.state_dict(), best_model_path)
         
-        #current_lr = scheduler.get_lr()[0]
-        #print(f"--> LR = {current_lr}")
-        
+        # Save tracking based on % of epochs
         if epoch_index in progress_points:
             percent = round((epoch_index / N_epochs) * 100,2)  # Calcula o percentual relativo
             print(f"\nExecutando epoca {epoch_index} / {N_epochs} ({percent:.1f}%)")
@@ -158,34 +168,22 @@ def full_train(model,
     save_training_metadata(metadata_file_name+"training_metadata_"+timestamp, metadata)
     return model_paths, train_costs_history, val_costs_history, metadata
 
-def save_training_metadata(filename, data):
-    """
-    Saves training metadata as a JSON file, appending to an existing JSON file if it exists.
-
-    Args:
-        filename (str): The name of the JSON file.
-        data (dict): A dictionary containing the training metadata.
-    """
-    # Ensure the filename has the .json extension
-    if not filename.endswith(".json"):
-        filename += ".json"
-
-    # Check if the file exists
-    if os.path.isfile(filename):
-        with open(filename, "r") as file:
-            existing_data = json.load(file)  # Load existing data
-    else:
-        existing_data = []
-
-    # Append new metadata
-    existing_data.append(data)
-
-    # Save back to JSON
-    with open(filename, "w") as file:
-        json.dump(existing_data, file, indent=4)
-
     
+def get_example(loader, i_batch, i_example):
+    input_example, target_example = next(itertools.islice(loader, i_batch, None)) 
+    input_example, target_example = input_example[i_example], target_example[i_example]
+    
+    print(f"  Input shape: {input_example.shape}")  # Shape of the in_shapeinput
+    print(f"  Output shape: {target_example.shape}\n")  # Shape of the output
+
+    return input_example, target_example
+
+#######################################################
+#********************* PLOTTERS **********************#
+#######################################################
+
 def Plot_Validation(train_cost_history, val_cost_history, normalize=False):
+    
     # Extract training history
     train_history_dicts = {loss_name: [] for loss_name in train_cost_history[0]}
     for epoch_dict in train_cost_history:
@@ -245,15 +243,7 @@ def Plot_Validation(train_cost_history, val_cost_history, normalize=False):
 
     plt.tight_layout()  # Adjust layout for readability
     plt.show()
-        
-def get_example(loader, i_batch, i_example):
-    input_example, target_example = next(itertools.islice(loader, i_batch, None)) 
-    input_example, target_example = input_example[i_example], target_example[i_example]
     
-    print(f"  Input shape: {input_example.shape}")  # Shape of the in_shapeinput
-    print(f"  Output shape: {target_example.shape}\n")  # Shape of the output
-
-    return input_example, target_example
     
 def Run_Example(model, loader, loss_functions, main_loss, title="Example", i_batch=0, i_example=0):
     
@@ -266,21 +256,13 @@ def Run_Example(model, loader, loss_functions, main_loss, title="Example", i_bat
     loss_example = loss_functions[main_loss]["obj"](pred_example, target_example) # Compute the example of loss
     print(f"{title},  {main_loss} Loss: {loss_example}")
     
-    plotter.display_image_tensor(input_example, title+"_input")
-    plotter.display_image_tensor(target_example, title+"_target")
-    plotter.display_image_tensor(pred_example, title+"_pred")
+    #plotter.display_image_tensor(input_example, title+"_input")
+    #plotter.display_image_tensor(target_example, title+"_target")
+    #plotter.display_image_tensor(pred_example, title+"_pred")
     plotter.display_example(input_example, pred_example, target_example, title=title)
 
 def Plot_DataloaderBatch(dataloader, num_images=5):
-    """
-    Displays a batch of images and masks from a DataLoader with filenames as titles.
 
-    Args:
-        dataloader: The DataLoader to retrieve the batch from.
-        num_images: The number of images to display (default: 5).
-    """
-    
-    
     data_iter = iter(dataloader)
     images, masks, img_names, mask_names = next(data_iter)  # Get filenames too
     
@@ -305,16 +287,33 @@ def Plot_DataloaderBatch(dataloader, num_images=5):
 
     plt.show()
     
+    
+#######################################################
+#************ METADATA HANDLERS **********************#
+#######################################################
 
+def save_training_metadata(filename, data):
 
+    # Ensure the filename has the .json extension
+    if not filename.endswith(".json"):
+        filename += ".json"
+
+    # Check if the file exists
+    if os.path.isfile(filename):
+        with open(filename, "r") as file:
+            existing_data = json.load(file)  # Load existing data
+    else:
+        existing_data = []
+
+    # Append new metadata
+    existing_data.append(data)
+
+    # Save back to JSON
+    with open(filename, "w") as file:
+        json.dump(existing_data, file, indent=4)
+        
 def save_metadata(filename, data, header=None):
-    """Appends a row (dictionary) to a CSV file, creating it if necessary.
 
-    Args:
-        filename: The name of the CSV file.
-        data: A dictionary representing the row to append.
-        header: An optional list representing the header row.
-    """
     file_exists = os.path.isfile(filename)
 
     if file_exists:

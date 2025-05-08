@@ -62,11 +62,11 @@ class INCEPTION_MODEL(fm.BASE_MODEL):
             )
                 
         if tail is None:
-            self.tail = nn.Sigmoid()
+            self.tail = nn.ReLU()
         else:
             self.tail = tail
         
-        self.model = nn.Sequential(model1, model2, self.tail)
+        self.model = nn.Sequential(model1, model2)#, self.tail)
         
         # Update metadata dictionary with inception model parameters
         self.metadata.update({
@@ -118,8 +118,9 @@ class RockAware_UNet(fm.BASE_MODEL):
         self.blocks = nn.ModuleList()
         
         N_blocks = int(np.ceil(np.log2(in_shape[1]/min_size)))
+        if N_blocks < 1: raise Exception("Input shape and specified minimum size do not converge to a number of blocks.")
         
-        print(f"\n creating Multi-block model with {N_blocks}:\n")
+        print(f"\n creating Multi-block model with {N_blocks} blocks:\n")
         block_metadata = []
         for i in range(N_blocks):
             print(f"Block {i+1}:\n")
@@ -153,7 +154,7 @@ class RockAware_UNet(fm.BASE_MODEL):
                 "Details": block.metadata
             })
             
-        self.tail = nn.Sigmoid()
+        self.tail = torch.nn.LeakyReLU(0.25) #nn.ReLU()
         
         # Save model-wide metadata
         self.metadata.update({

@@ -23,7 +23,12 @@ def get_vti_files(directory, full_path=False):
             for file in os.listdir(directory)
             if os.path.isfile(os.path.join(directory, file)) and file.endswith(".vti")
         ]
-        if len(vti_files) != 1: raise Exception("More than one .vti file inside",directory," ", vti_files)
+        if len(vti_files) == 0: 
+            print("Nenhum arquivo .vti encontrado no diretório ", directory)
+            return []
+            
+        if len(vti_files) != 1: 
+            raise Exception("More than one .vti file inside",directory,": ", vti_files)
 
         return vti_files[0]
     except FileNotFoundError:
@@ -184,31 +189,31 @@ class db_Creator:
         
     def _get_Text(self, raw_filename):
         return f"""
-MRT {{
-   tau = {self.tau}
-   F = {', '.join(map(str, self.F))}
-   timestepMax = {self.timestepMax}
-   tolerance = {self.tolerance}
-}}
-Domain {{
-   Filename = "{raw_filename}"
-   ReadType = "{self.read_type}"      // data type
-   N = {', '.join(map(str, self.N))}     // size of original image
-   nproc = {', '.join(map(str, self.nproc))}        // process grid
-   n = {', '.join(map(str, self.n))}      // sub-domain size
-   offset = {', '.join(map(str, self.offset))} // offset to read sub-domain
-   voxel_length = {self.voxel_length}    // self.voxel length (in microns)
-   ReadValues = {', '.join(map(str, self.read_values))}   // labels within the original image 
-   WriteValues = {', '.join(map(str, self.write_values))} // associated labels to be used by LBPM   (0:solid, 1..N:fluids)
-   BC = {self.boundary_condition}                 // boundary condition type (0 for periodic)
-}}
-Visualization {{
-   write_silo = {str(self.write_silo).lower()}     // write SILO databases with assigned variables
-   save_8bit_raw = {str(self.save_8bit_raw).lower()}  // write labeled 8-bit binary files with phase assignments
-   save_phase_field = {str(self.save_phase_field).lower()}  // save phase field within SILO database
-   save_pressure = {str(self.save_pressure).lower()}    // save pressure field within SILO database
-   save_velocity = {str(self.save_velocity).lower()}    // save velocity field within SILO database
-}}"""
+                MRT {{
+                   tau = {self.tau}
+                   F = {', '.join(map(str, self.F))}
+                   timestepMax = {self.timestepMax}
+                   tolerance = {self.tolerance}
+                }}
+                Domain {{
+                   Filename = "{raw_filename}"
+                   ReadType = "{self.read_type}"      // data type
+                   N = {', '.join(map(str, self.N))}     // size of original image
+                   nproc = {', '.join(map(str, self.nproc))}        // process grid
+                   n = {', '.join(map(str, self.n))}      // sub-domain size
+                   offset = {', '.join(map(str, self.offset))} // offset to read sub-domain
+                   voxel_length = {self.voxel_length}    // self.voxel length (in microns)
+                   ReadValues = {', '.join(map(str, self.read_values))}   // labels within the original image 
+                   WriteValues = {', '.join(map(str, self.write_values))} // associated labels to be used by LBPM   (0:solid, 1..N:fluids)
+                   BC = {self.boundary_condition}                 // boundary condition type (0 for periodic)
+                }}
+                Visualization {{
+                   write_silo = {str(self.write_silo).lower()}     // write SILO databases with assigned variables
+                   save_8bit_raw = {str(self.save_8bit_raw).lower()}  // write labeled 8-bit binary files with phase assignments
+                   save_phase_field = {str(self.save_phase_field).lower()}  // save phase field within SILO database
+                   save_pressure = {str(self.save_pressure).lower()}    // save pressure field within SILO database
+                   save_velocity = {str(self.save_velocity).lower()}    // save velocity field within SILO database
+                }}"""
                 
     def Create_File(self, folder, raw_filename):
         # Get the text content for the .db file
@@ -256,7 +261,8 @@ def Run_Example(simulations_main_folder,
                  simulation_name,
                  lbm_file_path,
                  lbm_functional="lbpm_permeability_simulator",
-                 mpi_file_path=None):
+                 mpi_file_path=None,
+                 vis2vtk=True):
     """
     Main function to run the LBM simulation and convert SILO files.
 
@@ -280,23 +286,21 @@ def Run_Example(simulations_main_folder,
         lbm_command = f"{mpi_file_path}bin/mpirun -np 1 {lbm_file_path}LBPM_dir/tests/{lbm_functional} {simulation_name}.db"
     run_commands_in_directory({file_path_simulation: lbm_command})
     
-    # Join the right vis folder
-    #vis_folder_path = find_highest_vis_folder(file_path_simulation)
-    #vis_folder = os.path.join(file_path_simulation, vis_folder_path)
-    
-    # Convert silo output to vti
-    #silo2vti_command = f"{lbm_file_path}converter_silo_vti/silo2vti summary.silo output.pvti"
-    #run_commands_in_directory({vis_folder: silo2vti_command})
+    # If the conversion from silo to vti is needed
+    if vis2vtk:
+        # Join the right vis folder
+        vis_folder_path = find_highest_vis_folder(file_path_simulation)
+        vis_folder = os.path.join(file_path_simulation, vis_folder_path)
+        # Convert silo output to vti
+        silo2vti_command = f"{lbm_file_path}converter_silo_vti/silo2vti summary.silo output.pvti"
+        run_commands_in_directory({vis_folder: silo2vti_command})
     
 
 def Save_Example(domain, simulation_name, simulations_main_folder, plot=False):
-    #
     # Create folder
     folder_name = folder_Creator(simulations_main_folder, simulation_name)
-    
     # Create .raw of this domain inside folder
     dc.save_as_raw(domain, folder_name, simulation_name)
-    
     if domain.ndim == 2:
         # Create db file for LBPM run associated to this domain inside folder
         dbCr = db_Creator(N=[domain.shape[1], domain.shape[0], 1],
@@ -305,9 +309,7 @@ def Save_Example(domain, simulation_name, simulations_main_folder, plot=False):
         dbCr = db_Creator(N=[domain.shape[2], domain.shape[1], domain.shape[0]],
                           n=[domain.shape[2], domain.shape[1], domain.shape[0]])
 
-    
     dbCr.Create_File(folder_name, simulation_name)
-    
     # Create guiding image inside the folder
     if plot: plot_heatmap(domain, folder_name, simulation_name)
 

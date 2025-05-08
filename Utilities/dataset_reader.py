@@ -31,7 +31,6 @@ class LBM_Dataset_Processor:
 
         Args:
             file_path (str): Path to the `.pt` dataset file.
-            array_shape (tuple): Expected shape for input images (e.g., (50, 50)).
         """
         self.file_path = file_path
         

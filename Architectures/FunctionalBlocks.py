@@ -222,7 +222,7 @@ class BLOCK_3(BASE_MODEL):
 
             self.dec_conv = nn.Sequential(self.dec_conv_3x3, self.dec_conv_1x1)
             
-        self.tail = nn.Sigmoid()
+        self.tail = nn.ReLU()
         
         # METADATA TRACKING:
         self.metadata.update({
@@ -413,12 +413,10 @@ class ConvBlock(nn.Module):
         if not (isinstance(kernel_size,int)): raise Exception("ConvBlock parameter kernel_size must be integer.")
         if not (isinstance(stride,int)): raise Exception("ConvBlock parameter stride must be integer.")
         if not (isinstance(padding,int)) and padding is not None: raise Exception("ConvBlock parameter stride must be integer or None.")
-         
+        
         padding = self.calculate_padding(input_size, kernel_size, stride, padding, dilation, output_size)
         
 
-        
-                
         # 2d convolution
         self.conv2d = nn.Conv2d(in_channels = in_channels,
                                 out_channels = out_channels,
@@ -427,12 +425,8 @@ class ConvBlock(nn.Module):
                                 padding = padding,
                                 dilation=dilation,
                                 bias=False)
-
-        # batchnorm
         self.batchnorm2d = nn.BatchNorm2d(out_channels)
-
-        #### ADAPTED FROM RELU TO CELU, FOLLOWING PREVIOUS LITERATURE
-        self.actv = nn.CELU()
+        self.actv = nn.LeakyReLU(0.25) #nn.ReLU()
         
         
         self.output_size = self.calculate_output_size(input_size, kernel_size, stride, padding, dilation)
@@ -454,7 +448,7 @@ class ConvBlock(nn.Module):
     def forward(self, x):
         # Pre-activation strategy following Dense methods
         #return self.conv2d(self.actv(self.batchnorm2d(x)))
-        return self.actv(self.batchnorm2d(self.conv2d(x)))
+        return self.batchnorm2d(self.actv(self.conv2d(x)))
     
     def calculate_output_size(self, input_size, kernel_size, stride, padding, dilation):
 
@@ -547,7 +541,7 @@ class ConvTransposeBlock(nn.Module):
         self.output_padding = output_padding
         
     def forward(self, x):
-        return self.actv(self.batchnorm2d(self.conv_transpose2d(x)))
+        return self.batchnorm2d(self.actv(self.conv_transpose2d(x)))
     
     def calculate_output_size_transpose(self, input_size, kernel_size, stride, padding, dilation, output_padding):
 

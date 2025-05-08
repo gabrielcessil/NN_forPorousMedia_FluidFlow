@@ -29,6 +29,7 @@ def save_as_raw(array, folder_name, simulation_name):
     
 def reflect_domain(domain):
     return np.hstack((domain, np.fliplr(domain)))
+def get_reflected_shape(shape): return (shape[0], shape[1], 2*shape[2])
 
 def create_media_fromPorosity(shape, minor_correlation_length, porosity):
     """
@@ -124,14 +125,14 @@ def create_media_fromTortuosity(shape, n_paths, path_width=1, minor_correlation_
 
 def create_media_fromTortuosity_and_porosity(shape, path_width, minor_correlation_length, tortuosity, porosity):
 
-    n_paths = int(np.ceil(porosity*shape[0]/path_width))
+    n_paths = int(np.ceil(porosity*shape[0]/path_width)/2)
     midia_tubos = create_media_fromTortuosity(shape, n_paths, path_width, minor_correlation_length, tortuosity)
 
     return midia_tubos
 
 
 
-def create_media_fromPorousTortuosity_and_porosity(shape, n_paths, path_width=1, minor_correlation_length=2, tortuosity=1, porosity=0.5):
+def create_media_fromPorousTortuosity_and_porosity(shape, path_width=1, minor_correlation_length=2, tortuosity=1, porosity=0.5):
     """
     Gera uma mídia porosa sintética com grãos organizados ao redor dos caminhos gerados por create_media_fromTortuosity.
     

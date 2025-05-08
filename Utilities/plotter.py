@@ -257,21 +257,17 @@ def display_image_tensor(tensor, filename):
     fig.savefig(filename + ".png", dpi=dpi)
     plt.close(fig)
     
+    
 def display_example(image_tensor, pred_tensor, target_tensor,
                     title="Example", title_image="Input", title_pred="Prediction", title_target="Target"):
     """
-    Displays a set of image, prediction, and target with proper channel handling.
-    Each tensor is displayed in a separate row, with its channels arranged in columns.
-    Image has a separate color scale, while Prediction & Target have their own separate color scales.
-    No interpolation is applied between pixels.
+    Displays input image, prediction, and target side by side with colorbars.
+    Prediction and target share the same color scale for direct comparison.
     """
 
-    # Print tensor shapes for debugging
-    print("image_tensor shape: ", image_tensor.shape)
-    print("pred_tensor shape: ", pred_tensor.shape)
-    print("target_tensor shape: ", target_tensor.shape)
-
-
+    print("image_tensor shape:", image_tensor.shape)
+    print("pred_tensor shape:", pred_tensor.shape)
+    print("target_tensor shape:", target_tensor.shape)
 
     image_tensor = to_numpy(image_tensor)
     pred_tensor = to_numpy(pred_tensor)
@@ -284,7 +280,7 @@ def display_example(image_tensor, pred_tensor, target_tensor,
         "Target": target_tensor.shape[0] if target_tensor.ndim == 3 else 1
     }
 
-    # Filter out tensors with zero channels
+    # Filter tensors with at least 1 channel
     subplot_tensors = {
         name: tensor for name, tensor in {
             "Image": image_tensor,
@@ -299,74 +295,75 @@ def display_example(image_tensor, pred_tensor, target_tensor,
         "Target": title_target
     }
 
-    # Find the actual number of rows and columns
-    num_rows = len(subplot_tensors)  # Rows correspond to the number of non-empty tensors
-    max_cols = max(num_channels.values())  # Max number of channels in any tensor
+    num_rows = len(subplot_tensors)
+    max_cols = max(num_channels.values())
 
-    # Compute separate min/max values for color scaling
+    # Compute color ranges
     image_vmin, image_vmax = image_tensor.min(), image_tensor.max()
-    pred_vmin, pred_vmax = pred_tensor.min(), pred_tensor.max()
-    target_vmin, target_vmax = target_tensor.min(), target_tensor.max()
+    shared_min = min(pred_tensor.min(), target_tensor.min())
+    shared_max = max(pred_tensor.max(), target_tensor.max())
 
-    # Create figure with adjusted dimensions
-    fig, axes = plt.subplots(nrows=num_rows, ncols=max_cols, 
-                             figsize=(max_cols * 5, num_rows * 4),  # Wider figure to accommodate colorbars
-                             squeeze=False, gridspec_kw={'wspace': 0.4, 'hspace': 0.4})
+    # Setup plot
+    fig, axes = plt.subplots(nrows=num_rows, ncols=max_cols,
+                             figsize=(max_cols * 5, num_rows * 4),
+                             squeeze=False, gridspec_kw={'wspace': 0.05, 'hspace': 0.1})
 
-    # Dictionary to store the last image plotted for colorbars
-    last_image = None
-    last_pred = None
-    last_target = None
+    last_image, last_pred, last_target = None, None, None
+    row_idx = 0
 
-    row_idx = 0  # Track actual used rows
     for name, tensor in subplot_tensors.items():
         current_channels = num_channels[name]
-
         for ch in range(current_channels):
             ax = axes[row_idx, ch]
             img = tensor[ch] if tensor.ndim == 3 else tensor
-            
-            # Use different color ranges
+
             if name == "Image":
-                im = ax.imshow(img, cmap="viridis", vmin=image_vmin, vmax=image_vmax, interpolation='none')
-                last_image = im  # Store last image plot for colorbar
+                im = ax.imshow(img, cmap="gist_gray", vmin=image_vmin, vmax=image_vmax, interpolation='none')
+                last_image = im
             elif name == "Prediction":
-                im = ax.imshow(img, cmap="magma", vmin=pred_vmin, vmax=pred_vmax, interpolation='none')
-                last_pred = im  # Store last prediction plot for colorbar
+                im = ax.imshow(img, cmap="plasma", vmin=shared_min, vmax=shared_max, interpolation='none')
+                last_pred = im
             elif name == "Target":
-                im = ax.imshow(img, cmap="plasma", vmin=target_vmin, vmax=target_vmax, interpolation='none')
-                last_target = im  # Store last target plot for colorbar
+                im = ax.imshow(img, cmap="plasma", vmin=shared_min, vmax=shared_max, interpolation='none')
+                last_target = im
 
             ax.set_xticks([])
             ax.set_yticks([])
 
-            if ch == 0:  # Set row titles
+            if ch == 0:
                 ax.set_ylabel(titles[name], fontsize=14, fontweight="bold")
+            if row_idx == 0:
+                ax.set_title(f"Channel {ch}", fontsize=18, fontweight="bold")
 
-            if row_idx == 0:  # Set column titles for channels
-                ax.set_title(f"Channel {ch}", fontsize=12)
-
-        # Hide any unused subplots in the row
+        # Hide unused columns
         for ch in range(current_channels, max_cols):
             fig.delaxes(axes[row_idx, ch])
 
-        row_idx += 1  # Move to the next row
+        row_idx += 1
 
-    # Adjust figure layout to create space for colorbars
-    plt.subplots_adjust(right=0.8)
-
-    # Add colorbars to the right side, ensuring they don't overlap with the plots
-    if last_image is not None:
-        cax1 = fig.add_axes([0.82, 0.55, 0.02, 0.3])  # Image colorbar (top right)
-        fig.colorbar(last_image, cax=cax1, orientation="vertical", label="Image Scale")
-
-    if last_pred is not None:
-        cax2 = fig.add_axes([0.82, 0.3, 0.02, 0.3])  # Prediction colorbar (middle right)
-        fig.colorbar(last_pred, cax=cax2, orientation="vertical", label="Prediction Scale")
-
-    if last_target is not None:
-        cax3 = fig.add_axes([0.82, 0.05, 0.02, 0.3])  # Target colorbar (bottom right)
-        fig.colorbar(last_target, cax=cax3, orientation="vertical", label="Target Scale")
+    plt.subplots_adjust(right=0.88)
+    
+    colorbar_width = 0.015
+    for row_idx, (im, label) in enumerate([
+        (last_image, "Image Scale"),
+        (last_pred, "Prediction/Target Scale"),
+        (last_target, None)
+    ]):
+        if im is None:
+            continue
+    
+        # Get the last used column index for this row
+        last_col = num_channels[list(subplot_tensors.keys())[row_idx]] - 1
+        pos = axes[row_idx, last_col].get_position()
+    
+        # Align colorbar after the last plot in the row
+        cax = fig.add_axes([
+            pos.x1 + 0.01,    # right of the last plot in the row
+            pos.y0,
+            colorbar_width,
+            pos.y1 - pos.y0
+        ])
+        fig.colorbar(im, cax=cax, orientation="vertical")
 
     fig.suptitle(title, fontsize=16, fontweight="bold")
     plt.show()
